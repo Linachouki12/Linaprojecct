@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="card">
+        <h2>Bienvenue dans l'outil d'analyse réseau Orange</h2>
+        <p style="color: #ccc;">Sélectionnez une option dans le menu pour commencer l'analyse.</p>
+    </div>
+
+    <div class="card">
+        <h2>En direct pour vous</h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+            <div style="background: rgba(40, 40, 40, 0.6); padding: 15px; border-radius: 5px; border-top: 3px solid #ff7900;">
+                <h3 style="margin-top: 0; color: #ff7900;">Analyse 4G</h3>
+                <h3 style="margin-top: 0; color: #ff7900;">Analyse 5G</h3>
+
+                <ul style="list-style-type: none; padding: 0; margin: 0;">
+                    <li style="padding: 5px 0; border-bottom: 1px dashed rgba(255,121,0,0.2);">
+                        <strong>Traitement des fichiers</strong>
+                        <span style="float: right; color: #aaa;">Disponible</span>
+                    </li>
+                    <li style="padding: 5px 0; border-bottom: 1px dashed rgba(255,121,0,0.2);">
+                        <strong>Analyse KPI</strong>
+                        <span style="float: right; color: #aaa;">Disponible</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div style="background: rgba(40, 40, 40, 0.6); padding: 15px; border-radius: 5px; border-top: 3px solid #ff7900;">
+                <h3 style="margin-top: 0; color: #ff7900;">Détection des cellules Overshooteuses</h3>
+                <ul style="list-style-type: none; padding: 0; margin: 0;">
+                    <li style="padding: 5px 0; border-bottom: 1px dashed rgba(255,121,0,0.2);">
+                        <strong>Importation de Fichier Cell Plan & Kpi Attempt</strong>
+                        <span style="float: right; color: #aaa;">Disponible</span>
+                    </li>
+                    <li style="padding: 5px 0;">
+                        <strong>Traitement</strong>
+                        <span style="float: right; color: #aaa;">Disponible</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Mes analyses récentes</h2>
+        <div style="display: flex; gap: 15px; overflow-x: auto; padding: 10px 0;">
+            <div style="min-width: 200px; background: rgba(255,121,0,0.1); padding: 15px; border-radius: 5px; border-left: 3px solid #ff7900;">
+                <strong>LTE_Analyse</strong>
+                <p style="margin: 5px 0 0; font-size: 0.9em; color: #bbb;"></p>
+            </div>
+            <div style="min-width: 200px; background: rgba(255,121,0,0.1); padding: 15px; border-radius: 5px; border-left: 3px solid #ff7900;">
+                <strong>NR_Analyse</strong>
+                <p style="margin: 5px 0 0; font-size: 0.9em; color: #bbb;"></p>
+            </div>
+            <div style="min-width: 200px; background: rgba(255,121,0,0.1); padding: 15px; border-radius: 5px; border-left: 3px solid #ff7900;">
+                <strong>Détection Overshoot Cellulaire</strong>
+                <p style="margin: 5px 0 0; font-size: 0.9em; color: #bbb;"></p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

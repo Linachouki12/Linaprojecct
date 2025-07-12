@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block head %}
+    {{ super() }}
+    <!-- OpenLayers - Alternative gratuite et open source -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.4.0/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v7.4.0/dist/ol.js"></script>
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .map-container {
+            position: relative;
+        }
+        #map-toolbar {
+            position: absolute;
+            top: .5em;
+            right: .5em;
+            left: auto;
+            z-index: 1000; /* Ensure it's on top */
+            background-color: rgba(255,255,255,0.8);
+            border-radius: 4px;
+            padding: 2px;
+        }
+        #map-toolbar button {
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+            background-color: white;
+            border: 1px solid #ccc;
+            margin: 1px;
+            cursor: pointer;
+        }
+        #map-toolbar button:hover {
+            background-color: #f0f0f0;
+        }
+        #map-toolbar button.active {
+            background-color: #e0e0e0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        #map-selection-toolbar {
+            left: 60px !important; /* décale la barre d’outils vers la droite */
+            top: 12px !important;
+            position: absolute !important;
+            z-index: 1100;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<style>
+    .overshoot-flex-layout {
+        display: flex;
+        flex-direction: row;
+        height: 90vh;
+        gap: 24px;
+    }
+    .overshoot-sidebar {
+        width: 340px;
+        min-width: 280px;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow-y: auto;
+        height: 100%;
+    }
+    .overshoot-main {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .overshoot-main .map-container {
+        flex: 1 1 0;
+        min-height: 0;
+        height: 100%;
+        position: relative;
+    }
+    #map {
+        width: 100%;
+        height: 100%;
+        min-height: 400px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    @media (max-width: 900px) {
+        .overshoot-flex-layout { flex-direction: column; }
+        .overshoot-sidebar { width: 100%; max-width: none; }
+        .overshoot-main { height: 400px; }
+    }
+</style>
+<div class="container-fluid px-3 px-md-5">
+    <h2 class="mb-4">Détection Overshoot Cellulaire</h2>
+    <!-- Messages flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show mb-4">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <div class="overshoot-flex-layout">
+        <div class="overshoot-sidebar">
+            <!-- Carte de présentation du workflow (déplacée ici) -->
+            <div class="card detection-overshoot mb-3">
+                <div class="card-body">
+                    <h3 class="card-title">Détection Overshoot Cellulaire</h3>
+                    <p class="card-text">Workflow d'analyse des overshoots</p>
+                </div>
+            </div>
+            <!-- Étape 1: Import du Cell Plan -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Étape 1: Import du fichier Cell Plan</h4>
+                    <span class="badge bg-light text-primary">Obligatoire</span>
+                </div>
+                <div class="card-body">
+                    {% if not cellplan_exists %}
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="cellplan_file" class="form-label">Sélectionnez le fichier Cell Plan :</label>
+                                <input class="form-control" type="file" id="cellplan_file" name="cellplan_file" accept=".xlsx,.xls" required>
+                                <div class="form-text">Format accepté: .xlsx/.csv/.xls</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" name="upload_cellplan">
+                                <i class="fas fa-upload me-2"></i>Importer
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-success d-flex align-items-center">
+                            <i class="fas fa-check-circle me-2 fs-4"></i>
+                            <div>Fichier Cell Plan déjà importé et prêt pour l'analyse</div>
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <form method="POST">
+                                <button type="submit" class="btn btn-outline-secondary me-md-2" name="reupload_cellplan">
+                                    <i class="fas fa-redo me-1"></i> Re-importer
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Étape 2: Extraction des IDs de sites -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Étape 2: Extraction des identifiants de sites</h4>
+                    <span class="badge bg-light text-info">Optionnelle</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Extraction des identifiants uniques de sites à partir du Cell Plan importé.</p>
+                    <form action="{{ url_for('extract_and_download_ids') }}" method="post" style="display:inline;">
+                        <button type="submit" class="btn btn-primary">Extraire les ID</button>
+                    </form>
+                </div>
+            </div>
+            <!-- Étape 3: Calcul des distances inter-sites -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Étape 3: Calcul des distances inter-sites</h4>
+                    <span class="badge bg-light text-warning">Automatique</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-3 fs-4"></i>
+                        <div>
+                            <strong>Mode cluster :</strong> Le calcul s'effectuera sur les sites sélectionnés sur la carte.
+                            <div class="mt-1 small">Les résultats seront classés par site .</div>
+                        </div>
+                    </div>
+                    <div id="selection-feedback" class="alert alert-secondary mb-3">
+                        <i class="fas fa-mouse-pointer me-2"></i>
+                        <span id="selected-sites-count">0</span> site(s) sélectionné(s)
+                    </div>
+                    <form method="POST" id="distance-form">
+                        <input type="hidden" id="selected-sites" name="selected_sites">
+                        <button type="submit" class="btn btn-warning btn-lg w-100 py-3" 
+                                name="calculate_distances" id="calculate-btn" disabled>
+                            <i class="fas fa-calculator me-2"></i>Analyser 
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="overshoot-main">
+            <!-- Carte interactive -->
+            <div class="card mb-0" style="height: 100%;">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Visualisation cartographique</h4>
+                    <span class="badge bg-light text-success">Interactive</span>
+                </div>
+                <div class="card-body" style="height: calc(100% - 56px); padding-bottom: 0;">
+                    {% if show_map %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Carte interactive de la Tunisie avec affichage des sites et secteurs
+                    </div>
+                    <!-- Contrôles de la carte -->
+                    <div class="map-controls mb-3">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="show-sites">
+                                <i class="fas fa-map-marker-alt me-1"></i>Afficher Sites
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" id="show-sectors">
+                                <i class="fas fa-route me-1"></i>Afficher Secteurs
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="reset-view">
+                                <i class="fas fa-home me-1"></i>Vue d'ensemble
+                            </button>
+                            <button id="btn-export-cells" class="btn btn-success">
+                                    <i class="fas fa-download me-2"></i>Exporter les cellules sélectionnées
+                                    </button>
+                        </div>
+                        <button id="measure-btn" class="btn btn-outline-warning btn-sm ms-2" title="Mesurer une distance">📏 Mesure</button>
+                        <span id="distance-value" style="margin-left:10px; font-weight:bold;"></span>
+                    </div>
+                    <div class="map-container">
+                        <div id="map-selection-toolbar" class="ol-control ol-unselectable">
+                            <button id="select-polygon" title="Sélection par polygone"><i class="fas fa-draw-polygon"></i></button>
+                            <button id="select-circle" title="Sélection par cercle"><i class="far fa-circle"></i></button>
+                            <button id="select-box" title="Sélection par rectangle"><i class="far fa-square"></i></button>
+                            <button id="clear-selection-btn" title="Effacer la sélection"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                        <div id="map-search-container" class="ol-control">
+                            <input type="text" id="map-search-input" placeholder="Chercher un site (ex: ARI_0003)">
+                            <button id="map-search-button" title="Rechercher"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div id="map"></div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-map-marked-alt me-2"></i>
+                        Importez d'abord un fichier Cell Plan pour visualiser la carte
+                    </div>
+                    {% endif %}
+                </div> <!-- Fermeture du card-body -->
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+{% endblock %}

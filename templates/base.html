@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse Réseau Orange</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Analyse Réseau Orange</h1>
+        </header>
+
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="{{ url_for('index') }}">Accueil</a></li>
+
+                <li><a href="{{ url_for('option1') }}">Diagnostic KPI 4G</a></li>
+                <li><a href="{{ url_for('option2') }}">Diagnostic KPI 5G</a></li>
+
+                <li><a href="{{ url_for('option3') }}">Détection Overshoot Cellulaire</a></li>
+            </ul>
+        </nav>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+
+        
+
+        <footer class="footer">
+            <p>© 2023 Analyse Réseau Orange - Tous droits réservés</p>
+        </footer>
+    </div>
+</body>
+</html>

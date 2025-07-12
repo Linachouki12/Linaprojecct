@@ -1,0 +1,8 @@
+requests
+pandas
+openpyxl
+xlsxwriter
+folium
+numpy
+Flask
+fnmatch
