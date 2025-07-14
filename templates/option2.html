@@ -34,7 +34,7 @@
                 <input type="file" id="files" name="files" multiple accept=".xlsx,.xls,.csv" class="form-control">
             </div>
             
-            <button type="submit" class="btn btn-primary mt-2">
+            <button type="submit" class="btn btn-primary mt-2" id="runAnalysis5gBtn" style="margin-bottom:0;">
                 <i class="fas fa-play me-2"></i>Lancer l'analyse
             </button>
         </form>
@@ -48,12 +48,14 @@
   </div>
 </div>
 
-<select id="siteSelect" class="form-control mt-2" onchange="updateKpiList()" style="display:none">
+<select id="siteSelect" class="form-control mt-2" onchange="onSiteChange()">
     <option selected disabled>Choisir un site</option>
 </select>
-
-<select id="kpiSelect" class="form-control mt-2" onchange="loadKpiData()" style="display:none">
+<select id="kpiSelect" class="form-control mt-2" onchange="onKpiChange()" style="display:none">
     <option selected disabled>Choisir un KPI</option>
+</select>
+<select id="sectorSelect" class="form-control mt-2" onchange="onSectorChange()" style="display:none">
+    <option selected disabled>Choisir un secteur</option>
 </select>
 
 <div style="display: flex; flex-direction: column; align-items: center;">

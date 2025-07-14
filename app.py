@@ -180,6 +180,24 @@ def get_5gsites_list():
 
 
 
+
+@app.route('/api/secteurs',methods=['GET'])
+def get_secteurs():
+    site = request.args.get('site')
+    period = request.args.get('period')
+    print(f"DEBUG: site={site}, period={period}")
+    df = load_report_file(app.config['BASE_FOLDER'], period) 
+    print(f"DEBUG: Colonnes: {df.columns}")
+
+    df['last_digit'] = df[df['eNodeB Name']== site]['Cell Name'].str.extract(r'(\d)$')
+
+    secteurs = df.groupby('last_digit')['Cell Name'].apply(lambda group: list(set(group))).to_dict() 
+    
+    print(f"DEBUG: Secteurs trouvés: {secteurs}")
+
+    return jsonify(secteurs)
+
+
 @app.route('/api/kpi-data', methods=['GET', 'POST'])
 def get_kpi_data():
     if request.method == 'POST':
@@ -300,15 +318,14 @@ def get_kpi_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-@app.route('/api/secteurs',methods=['GET'])
-def get_secteurs():
+@app.route('/api/5gsecteurs',methods=['GET'])
+def get_5gsecteurs():
     site = request.args.get('site')
     period = request.args.get('period')
     print(f"DEBUG: site={site}, period={period}")
-    df = load_report_file(app.config['BASE_FOLDER'], period) 
+    df = load_report5g_file(app.config['BASE_FOLDER'], period) 
     print(f"DEBUG: Colonnes: {df.columns}")
-
-    df['last_digit'] = df[df['eNodeB Name']== site]['Cell Name'].str.extract(r'(\d)$')
+    df['last_digit'] = df[df['gNodeB Name']== site]['Cell Name'].str.extract(r'(\d)$')
 
     secteurs = df.groupby('last_digit')['Cell Name'].apply(lambda group: list(set(group))).to_dict() 
     
@@ -317,57 +334,125 @@ def get_secteurs():
     return jsonify(secteurs)
 
 
-@app.route('/api/kpi-data5g', methods=['GET', 'POST'])
+@app.route('/api/kpi-5gdata', methods=['GET', 'POST'])
 def get_kpi_5gdata():
     if request.method == 'POST':
         data = request.get_json()
         period = data.get('period')
         site = data.get('site')
         kpi = data.get('kpi')
+        secteur = data.get('secteur')
     else:  # GET
         period = request.args.get('period')
         site = request.args.get('site')
         kpi = request.args.get('kpi')
+        secteur = request.args.get('secteur')
     try:
         df = load_report5g_file(app.config['BASE_FOLDER'], period)
-        df_site = df[df['gNodeB Name'] == site] if site else df
-        df_site['Date'] = pd.to_datetime(df_site['Date'], dayfirst=True)
+        df_site = df[df['gNodeB Name'] == site].copy() if site else df.copy()
+        print("DEBUG: site  sélectionné:", df_site)
+       
+        if secteur:
+    # Recalcule le mapping secteur -> cellules à partir de df_site
+            secteur_dict = {}
+            for cell in df_site['Cell Name'].dropna().unique():
+                suffix = cell.strip().split('_')[-1]  # Extrait le "h1", "l1", etc.
+                secteur_num = suffix[-1]              # Extrait le dernier chiffre (ex: "1")
+                secteur_dict.setdefault(secteur_num, []).append(cell)
+
+            # Récupère les cellules du secteur demandé
+            cellules_du_secteur = secteur_dict.get(str(secteur), [])
+            print("DEBUG: Cellules du secteur sélectionné:", cellules_du_secteur)
+
+            # Filtrer le DataFrame pour ne garder que les lignes du secteur sélectionné
+            df_secteur = df_site[df_site['Cell Name'].isin(cellules_du_secteur)].copy()
+            print("DEBUG: DataFrame du secteur sélectionné:", df_secteur)
+            print(df_secteur.head())  # affiche un aperçu
+            if not df_secteur.empty:
+                min_date = df_secteur['Date'].min()
+                max_date = df_secteur['Date'].max()
+                all_dates = pd.date_range(min_date, max_date, freq='D').strftime('%Y-%m-%d').tolist()
+            else:
+                all_dates = []
+            dates = all_dates
+            print("Dates sélectionnés:", all_dates)
+        df_site.loc[:, 'Date'] = pd.to_datetime(df_site['Date'], dayfirst=True)
         df_site = df_site.sort_values('Date')
 
-        values = df_site[kpi].astype(float).tolist() if kpi else []
-        dates = df_site['Date'].dt.strftime('%Y-%m-%d').tolist() if kpi else []
-        cell_names = df_site['Cell Name'].tolist() if 'Cell Name' in df_site.columns else []
-        current = values[-1] if values else None
-        moyenne = sum(values[:-1]) / (len(values)-1) if len(values) > 1 else current
-        variation = ((current - moyenne) / moyenne) * 100 if moyenne and moyenne != 0 else 0
+        if secteur:
+            cell_series = {}
+            cell_variations={}
+            call_seuils={}
+            kpi_key = kpi.replace('_Valeur', '') if kpi else None
+            threshold_info = KPI_THRESHOLDS_5G.get(kpi_key, None)
 
-        # Seuils
-        kpi_key = kpi.replace('_Valeur', '') if kpi else None
-        threshold_info = KPI_THRESHOLDS_5G.get(kpi_key, None)
-        seuil_depasse = False
-        if threshold_info and values:
-            seuil = threshold_info['threshold']
-            mode = threshold_info['mode']
-            if mode == 'greater':
-                seuil_depasse = any(v > seuil for v in values)
-            elif mode == 'less':
-                seuil_depasse = any(v < seuil for v in values)
+            for cell in df_secteur['Cell Name'].unique():
+                cell_df = df_secteur[df_secteur['Cell Name'] == cell]
+                # Aligne les valeurs sur toutes les dates (None si manquant)
+                values = []
+                for d in dates:
+                    row = cell_df[cell_df['Date'].dt.strftime('%Y-%m-%d') == d]
+                    if not row.empty:
+                        try:
+                            values.append(float(row.iloc[0][kpi]))
+                        except Exception:
+                            values.append(None)
+                    else:
+                        values.append(None)
+                cell_series[cell] = values
+            
+                filtered_vals = [v for v in values if v is not None]
+                if len(filtered_vals) > 1:
+                    moyenne = sum(filtered_vals[:-1]) / (len(filtered_vals) - 1)
+                    current = filtered_vals[-1]
+                    variation = ((current - moyenne) / moyenne) * 100 if moyenne != 0 else 0
+                elif len(filtered_vals) == 1:
+                    moyenne = filtered_vals[0]
+                    current = filtered_vals[0]
+                    variation = 0
+                else:
+                    moyenne = None
+                    current = None
+                    variation = 0 
 
-        return jsonify({
-            'dates': dates,
-            'values': values,
-            'cell_names': cell_names,
-            'moyenne': round(moyenne, 2) if moyenne is not None else None,
-            'current': round(current, 2) if current is not None else None,
-            'variation': round(variation, 2) if moyenne else 0,
-            'seuil_depasse': seuil_depasse,
-            'seuil': threshold_info['threshold'] if threshold_info else None,
-            'seuil_mode': threshold_info['mode'] if threshold_info else None
-        })
+                seuil_depasse = False
+                if threshold_info and filtered_vals:
+                    seuil= threshold_info['threshold']
+                    mode=threshold_info['mode']
+                    if mode == 'greater':
+                        seuil_depasse = any(v> seuil for v in filtered_vals)
+                    elif mode =='less':
+                        seuil_depasse = any ( v< seuil for v in filtered_vals)
+                cell_variations[cell]= {
+                    'variation': variation,
+                    'moyenne' : moyenne,
+                    'current' : current,
+                    'seuil_depasse' : seuil_depasse
+                }
+            #values = df_site[kpi].astype(float).tolist() if kpi else []
+            #dates = df_site['Date'].dt.strftime('%Y-%m-%d').tolist() if kpi else []
+            #cell_names = df_secteur['Cell Name'].tolist() if 'Cell Name' in df_secteur.columns else []
+            #current = values[-1] if values else None
+            #moyenne = sum(values[:-1]) / (len(values)-1) if len(values) > 1 else current
+            #variation = ((current - moyenne) / moyenne) * 100 if moyenne and moyenne != 0 else 0
+
+            # Seuils
+            
+            
+            
+
+            return jsonify({
+                'dates': dates,
+
+                'cell_series': cell_series,
+                #'values': values,
+                'cell_stats': cell_variations,
+                #'cell_names': cell_names,
+                'seuil': threshold_info['threshold'] if threshold_info else None,
+                'seuil_mode': threshold_info['mode'] if threshold_info else None
+            })
     except Exception as e:
         return jsonify({'error': str(e)}), 400
-
-
 
 
 @app.route('/option2', methods=['GET', 'POST'])

@@ -91,7 +91,6 @@ function updateKpiList() {
         kpiSelect.appendChild(opt);
     });
 }
-// Ancienne fonction loadKpiData supprimée car non compatible avec la logique secteur
 
 function drawChart(labels, datasetsOrValues) {
     const ctx = document.getElementById("kpiChart").getContext("2d");
