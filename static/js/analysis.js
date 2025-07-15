@@ -141,7 +141,7 @@ function updateKpiInfo(current, moyenne, variation, seuilDepasse, seuil, seuilMo
     if (seuilDepasse) {
         color = "red";
         icon = "<i class='fas fa-exclamation-triangle' title='Seuil KPI dépassé'></i> ";
-        msg = `⚠️ Seuil du KPI dépassé : au moins une valeur a franchi le seuil fixé (${seuil} - mode ${seuilMode === 'greater' ? '>' : '<'}).`;
+        msg = `⚠️ Seuil du KPI dépassé : au moins une valeur a franchi le seuil fixé (${seuil} - mode (sup ou inf) ${seuilMode === 'greater' ? '>' : '<'}).`;
     } else if (Math.abs(variation) > seuilVariation) {
         color = "orange";
         icon = "<i class='fas fa-exclamation-circle' title='Variation importante'></i> ";

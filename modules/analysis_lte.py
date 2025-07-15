@@ -22,8 +22,8 @@ def run_kpi_analysis(base_folder):
     analysis_periods = {
         'J-1': (max_date - timedelta(days=1), max_date),
         'J-7': (max_date - timedelta(days=7), max_date),
-        'J-30': (max_date - timedelta(days=30), max_date),
-        'Personnalisé': (min_date, max_date)
+        'J-30': (max_date - timedelta(days=30), max_date)
+        #'Personnalisé': (min_date, max_date)
     }
     
     for period_name, date_range in analysis_periods.items():
